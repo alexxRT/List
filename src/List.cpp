@@ -23,7 +23,7 @@ void DestroyDumpFile ()
     dump_file = NULL;
 }
 
-int LIST_CHECK(my_list* list, int stat)
+int ListCheck(my_list* list, int stat)
 {
     int counter = 0;
 
@@ -47,23 +47,23 @@ enum ERROR_CODES
 
 // LEFT(el) add macroses
 
-int HeadInsert (list_elem* head, list_elem* elem)
+int InsertRight (list_elem* dest, list_elem* elem)
 {
-    list_elem* old_elem = head->next;
+    list_elem* old_elem = dest->next;
 
-    head->next     = elem;
-    elem->prev     = head;
+    dest->next     = elem;
+    elem->prev     = dest;
     elem->next     = old_elem;
     old_elem->prev = elem;
 
     return SUCCESS;
 }
 
-list_elem* HeadPop (list_elem* head)
+list_elem* PopRight (list_elem* dest)
 {
-    list_elem* pop_elem = head->next;
-    head->next = pop_elem->next;
-    pop_elem->next->prev = head;
+    list_elem* pop_elem = dest->next;
+    dest->next = pop_elem->next;
+    pop_elem->next->prev = dest;
 
     pop_elem->prev = NULL;
     pop_elem->next = NULL;
@@ -71,7 +71,32 @@ list_elem* HeadPop (list_elem* head)
     return pop_elem;
 }
 
-list_elem* PopFromFreeList (my_list* list)
+int InsertLeft (list_elem* dest, list_elem* elem)
+{
+    list_elem* old_elem = dest->prev;
+
+    dest->prev = elem;
+    elem->next = dest;
+    elem->prev = old_elem;
+    old_elem->next = elem;
+
+    return SUCCESS;
+}
+
+list_elem* PopLeft (list_elem* dest)
+{
+    list_elem* pop_elem = dest->prev;
+    dest->prev = pop_elem->prev;
+    pop_elem->prev->next = dest;
+
+    pop_elem->next = NULL;
+    pop_elem->prev = NULL;
+
+    return pop_elem;
+}
+
+
+list_elem* PopFreeList (my_list* list)
 {
     assert (list            != NULL);
     assert (list->free_head != NULL);
@@ -88,7 +113,7 @@ list_elem* PopFromFreeList (my_list* list)
     }
     else 
     {
-        list_elem* pop_elem = HeadPop (head);
+        list_elem* pop_elem = PopRight (head);
 
         return pop_elem;
     }
@@ -97,7 +122,7 @@ list_elem* PopFromFreeList (my_list* list)
 }
 
 
-int AddToFreeList (my_list* list, list_elem* elem)
+int InsertFreeList (my_list* list, list_elem* elem)
 {
     assert (list != NULL);
     assert (elem != NULL);
@@ -112,7 +137,7 @@ int AddToFreeList (my_list* list, list_elem* elem)
         elem->prev = elem;
     }
     else
-        HeadInsert (list->free_head, elem);
+        InsertRight (list->free_head, elem);
 
     return SUCCESS;
 }
@@ -121,14 +146,14 @@ int ListAdd (my_list* list, list_data_t data)
 {
     //ListResize (list);
 
-    list_elem* new_to_add = PopFromFreeList (list);
+    list_elem* new_to_add = PopFreeList (list);
     new_to_add->status = ENGAGED;
     list->size ++;
 
     new_to_add->data = data;
     list_elem* head = list->buffer;
 
-    HeadInsert (head, new_to_add);
+    InsertRight (head, new_to_add);
 
     return SUCCESS;
 }
@@ -144,11 +169,11 @@ int ListPop (my_list* list, list_data_t* data)
     list_elem* head = list->buffer;
     list->size --;
 
-    list_elem* pop_elem = HeadPop (head);
+    list_elem* pop_elem = PopRight (head);
     pop_elem->status = FREE;
     *data = pop_elem->data;
 
-    AddToFreeList (list, pop_elem);
+    InsertFreeList (list, pop_elem);
     //ListResize(list);
 
     return SUCCESS;
@@ -216,13 +241,13 @@ int ListTextDump (my_list* list)
     fprintf (dump_file, "List head address [%p]\n", list->buffer);
 
     fprintf   (dump_file, "Now in the list [%d/%d] elems are engaged\n" , list->size, list->capacity);
-    fprintf   (dump_file, "CHECKING...\n [%d] - after direct counting\n", LIST_CHECK(list, ENGAGED));
+    fprintf   (dump_file, "CHECKING...\n[%d] - after direct counting\n", ListCheck(list, ENGAGED));
 
     fprintf   (dump_file, "listing of engaged elems:\n");
     PrintList (list, ENGAGED);
 
     fprintf   (dump_file, "Now in the list [%d] elems are free\n", list->capacity - list->size);
-    fprintf   (dump_file, "CHECKING...\n [%d] - after direct counting\n", LIST_CHECK(list, FREE));
+    fprintf   (dump_file, "CHECKING...\n[%d] - after direct counting\n", ListCheck(list, FREE));
 
     fprintf   (dump_file, "Listing of free elems:\n");
     PrintList (list, FREE);
@@ -250,7 +275,7 @@ int ListInit (my_list* list, size_t elem_num)
     for (int i = 1; i < elem_num + 1; i++)
     {
         list->buffer[i].index = i;
-        AddToFreeList (list, list->buffer + i);
+        InsertFreeList (list, list->buffer + i);
     }
 
     return SUCCESS;
@@ -261,6 +286,9 @@ int ListDestroy (my_list* list)
     assert (list != NULL);
 
     list->capacity = 0;
+    list->size = 0;
+    list->free_head = NULL;
+
     FREE (list->buffer);
 
     return SUCCESS;

@@ -1,0 +1,88 @@
+
+
+-------------------------LIST DUMP OCCURED-----------------------
+
+List address [0x16db6f760]
+List head address [0x146606790]
+Now in the list [2/10] elems are engaged
+CHECKING...
+ [2] - after direct counting
+listing of engaged elems:
+
+Order number [1]
+Elem address [0x1466068b0]
+Elem index   [9]
+Elem data    [6]
+Elem status  [2]
+
+
+Order number [2]
+Elem address [0x1466068d0]
+Elem index   [10]
+Elem data    [5]
+Elem status  [2]
+
+Now in the list [8] elems are free
+CHECKING...
+ [8] - after direct counting
+Listing of free elems:
+
+Order number [1]
+Elem address [0x1466067b0]
+Elem index   [1]
+Elem data    [0]
+Elem status  [1]
+
+
+Order number [2]
+Elem address [0x146606890]
+Elem index   [8]
+Elem data    [0]
+Elem status  [1]
+
+
+Order number [3]
+Elem address [0x146606870]
+Elem index   [7]
+Elem data    [0]
+Elem status  [1]
+
+
+Order number [4]
+Elem address [0x146606850]
+Elem index   [6]
+Elem data    [0]
+Elem status  [1]
+
+
+Order number [5]
+Elem address [0x146606830]
+Elem index   [5]
+Elem data    [0]
+Elem status  [1]
+
+
+Order number [6]
+Elem address [0x146606810]
+Elem index   [4]
+Elem data    [0]
+Elem status  [1]
+
+
+Order number [7]
+Elem address [0x1466067f0]
+Elem index   [3]
+Elem data    [0]
+Elem status  [1]
+
+
+Order number [8]
+Elem address [0x1466067d0]
+Elem index   [2]
+Elem data    [0]
+Elem status  [1]
+
+
+
+-------------------------LIST DUMP FINISHED-----------------------
+

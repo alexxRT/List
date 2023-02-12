@@ -47,6 +47,30 @@ enum ERROR_CODES
 
 // LEFT(el) add macroses
 
+int HeadInsert (list_elem* head, list_elem* elem)
+{
+    list_elem* old_elem = head->next;
+
+    head->next     = elem;
+    elem->prev     = head;
+    elem->next     = old_elem;
+    old_elem->prev = elem;
+
+    return SUCCESS;
+}
+
+list_elem* HeadPop (list_elem* head)
+{
+    list_elem* pop_elem = head->next;
+    head->next = pop_elem->next;
+    pop_elem->next->prev = head;
+
+    pop_elem->prev = NULL;
+    pop_elem->next = NULL;
+
+    return pop_elem;
+}
+
 list_elem* PopFromFreeList (my_list* list)
 {
     assert (list            != NULL);
@@ -57,12 +81,14 @@ list_elem* PopFromFreeList (my_list* list)
     if (head->next == head) //only head left
     {
         list->free_head = NULL;
+        head->next = NULL;
+        head->prev = NULL;
+
         return head;
     }
     else 
     {
-        list_elem* pop_elem = list->free_head->next;
-        list->free_head->next = pop_elem->next;
+        list_elem* pop_elem = HeadPop (head);
 
         return pop_elem;
     }
@@ -70,24 +96,23 @@ list_elem* PopFromFreeList (my_list* list)
     return NULL;
 }
 
+
 int AddToFreeList (my_list* list, list_elem* elem)
 {
     assert (list != NULL);
     assert (elem != NULL);
 
     elem->status = FREE;
+    elem->data = 0;
 
     if (list->free_head == NULL) // no free elems
     {
-        list->free_head = elem;
-        elem->next = elem;       //cycling the list
+        list->free_head = elem;   //initing free head
+        elem->next = elem;        //cycling the list
+        elem->prev = elem;
     }
     else
-    {
-        list_elem* old_elem = list->free_head->next;
-        list->free_head->next = elem;
-        elem->next = old_elem;
-    }
+        HeadInsert (list->free_head, elem);
 
     return SUCCESS;
 }
@@ -103,9 +128,7 @@ int ListAdd (my_list* list, list_data_t data)
     new_to_add->data = data;
     list_elem* head = list->buffer;
 
-    list_elem* old_next = head->next;
-    head->next = new_to_add;
-    new_to_add->next = old_next;
+    HeadInsert (head, new_to_add);
 
     return SUCCESS;
 }
@@ -116,17 +139,14 @@ int ListPop (my_list* list, list_data_t* data)
 
     if (list->capacity == 0)
         return LIST_EMPTY;
-
+    
+    
     list_elem* head = list->buffer;
-    list_elem* pop_elem = head->next;
-
-    pop_elem->status = FREE;
     list->size --;
 
+    list_elem* pop_elem = HeadPop (head);
+    pop_elem->status = FREE;
     *data = pop_elem->data;
-
-    head->next = pop_elem->next;
-    pop_elem->next = NULL;
 
     AddToFreeList (list, pop_elem);
     //ListResize(list);

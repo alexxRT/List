@@ -10,6 +10,8 @@ const int MASTER  = 3; // main list head
 
 static FILE* dump_file = NULL; 
 
+void PrintListElem (list_elem* elem);
+
 void InitDumpFile ()
 {
     dump_file = fopen ("../sys/DUMP.txt", "a");
@@ -43,9 +45,23 @@ enum ERROR_CODES
     LIST_FULL      = 3,
     LIST_EMPTY     = 4,
     REALLOC_FAILED = 5,
+    INVALID_ID     = 6
 };
 
 // LEFT(el) add macroses
+
+
+list_elem* GetElem (my_list* list, size_t id)
+{
+    list_elem* to_get = list->buffer;
+
+    for (int i = 0; i < id; i ++)
+    {
+        to_get = to_get->next;
+    }
+
+    return to_get;
+}
 
 int InsertRight (list_elem* dest, list_elem* elem)
 {
@@ -59,21 +75,23 @@ int InsertRight (list_elem* dest, list_elem* elem)
     return SUCCESS;
 }
 
-list_elem* PopRight (list_elem* dest)
+int DeleteRight (list_elem* dest)
 {
-    list_elem* pop_elem = dest->next;
-    dest->next = pop_elem->next;
-    pop_elem->next->prev = dest;
+    list_elem* del_elem = dest->next;
+    dest->next = del_elem->next;
+    del_elem->next->prev = dest;
 
-    pop_elem->prev = NULL;
-    pop_elem->next = NULL;
+    del_elem->prev = NULL;
+    del_elem->next = NULL;
 
-    return pop_elem;
+    return SUCCESS;
 }
 
 int InsertLeft (list_elem* dest, list_elem* elem)
 {
     list_elem* old_elem = dest->prev;
+
+    //PrintListElem (old_elem);
 
     dest->prev = elem;
     elem->next = dest;
@@ -83,20 +101,20 @@ int InsertLeft (list_elem* dest, list_elem* elem)
     return SUCCESS;
 }
 
-list_elem* PopLeft (list_elem* dest)
+int DeleteLeft (list_elem* dest)
 {
-    list_elem* pop_elem = dest->prev;
-    dest->prev = pop_elem->prev;
-    pop_elem->prev->next = dest;
+    list_elem* del_elem = dest->prev;
+    dest->prev = del_elem->prev;
+    del_elem->prev->next = dest;
 
-    pop_elem->next = NULL;
-    pop_elem->prev = NULL;
+    del_elem->next = NULL;
+    del_elem->prev = NULL;
 
-    return pop_elem;
+    return SUCCESS;
 }
 
 
-list_elem* PopFreeList (my_list* list)
+list_elem* TakeFreeList (my_list* list)
 {
     assert (list            != NULL);
     assert (list->free_head != NULL);
@@ -113,7 +131,8 @@ list_elem* PopFreeList (my_list* list)
     }
     else 
     {
-        list_elem* pop_elem = PopRight (head);
+        list_elem* pop_elem = head->next;
+        DeleteRight (head);
 
         return pop_elem;
     }
@@ -142,38 +161,52 @@ int InsertFreeList (my_list* list, list_elem* elem)
     return SUCCESS;
 }
 
-int ListAdd (my_list* list, list_data_t data)
+int ListInsertRight (my_list* list, size_t id, list_data_t data)
 {
     //ListResize (list);
 
-    list_elem* new_to_add = PopFreeList (list);
+    list_elem* new_to_add = TakeFreeList (list);
     new_to_add->status = ENGAGED;
     list->size ++;
 
     new_to_add->data = data;
-    list_elem* head = list->buffer;
 
-    InsertRight (head, new_to_add);
+    list_elem* dest = GetElem (list, id);
+    InsertRight (dest, new_to_add);
 
     return SUCCESS;
 }
 
-int ListPop (my_list* list, list_data_t* data)
+
+int ListInsertLeft (my_list* list, size_t id, list_data_t data)
+{
+    //ListResize (list);
+
+    list_elem* new_to_add = TakeFreeList (list);
+    new_to_add->status = ENGAGED;
+    list->size ++;
+
+    new_to_add->data = data;
+
+    list_elem* dest = GetElem (list, id);
+    InsertLeft (dest, new_to_add);
+
+    return SUCCESS;
+}
+
+int ListDelete (my_list* list, size_t id)
 {
     assert (list != NULL);
 
     if (list->capacity == 0)
         return LIST_EMPTY;
     
-    
-    list_elem* head = list->buffer;
+    list_elem* del_elem = GetElem (list, id); 
+
+    DeleteRight (del_elem->prev);
     list->size --;
 
-    list_elem* pop_elem = PopRight (head);
-    pop_elem->status = FREE;
-    *data = pop_elem->data;
-
-    InsertFreeList (list, pop_elem);
+    InsertFreeList (list, del_elem);
     //ListResize(list);
 
     return SUCCESS;
@@ -270,6 +303,7 @@ int ListInit (my_list* list, size_t elem_num)
 
     list->buffer[0].status = MASTER;
     list->buffer[0].next = list->buffer;
+    list->buffer[0].prev = list->buffer;
     //list->buffer[0].prev = NULL;
 
     for (int i = 1; i < elem_num + 1; i++)

@@ -1,14 +1,22 @@
 #include "../lib/Memory.h"
 #include "../lib/List.h"
+#include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
-
 
 const int FREE    = 1;
 const int ENGAGED = 2; 
 const int MASTER  = 3; // main list head
 
-static FILE* dump_file = NULL; 
+static FILE* dump_file  = NULL; 
+static FILE* graph_file = NULL;
+
+
+// #define SET_NODE( elem_ptr, id )                                                                          \
+// fprintf (graph_file, "[label = \"Num: %d|indx: %d|data: %d\";];\n", id, elem_ptr->index, elem_ptr->data)  \
+
+// #define SET_COLOR( elem_ptr, id, color)                    \
+// fprintf (graph_file, "[color = \"%s\";];\n", color)        \
 
 void PrintListElem (list_elem* elem);
 
@@ -25,11 +33,24 @@ void DestroyDumpFile ()
     dump_file = NULL;
 }
 
+void InitGraphDumpFile ()
+{
+    graph_file = fopen ("../graphviz/test.gv", "w");
+    assert (graph_file != NULL);
+}
+
+void DestroyGraphDumpFile ()
+{
+    fflush (graph_file);
+    fclose (graph_file);
+    graph_file = NULL;
+}
+
 int ListCheck(my_list* list, int stat)
 {
     int counter = 0;
 
-    for (int i = 1; i < list->capacity+1; i++)
+    for (int i = 0; i <= list->capacity; i++)
     {
         if (list->buffer[i].status == stat)
             counter ++;
@@ -62,6 +83,30 @@ list_elem* GetElem (my_list* list, size_t id)
 
     return to_get;
 }
+
+int GetElemId (list_elem* head, int index)
+{
+    int counter = 0;
+
+    if (index == head->index)
+        return counter;
+
+    counter++;
+
+    list_elem* current_elem = head->next;
+
+    while (current_elem != head)
+    {
+        if (index == current_elem->index)
+            return counter;
+        
+        current_elem = current_elem->next;
+        counter++;
+    }
+
+    return -1; //but it is not success :(( add error constant
+}
+
 
 int InsertRight (list_elem* dest, list_elem* elem)
 {
@@ -227,7 +272,7 @@ void PrintList (my_list* list, int list_type)
 {
     if (list_type == ENGAGED)
     {
-        list_elem* head = list->buffer;
+        list_elem* head =       list->buffer;
         list_elem* debug_elem = head->next;
 
         int order_num = 1;
@@ -291,6 +336,90 @@ int ListTextDump (my_list* list)
 }
 
 
+int ListGraphDump (my_list* list)
+{
+    //dump of engaged elems
+
+    //initilizing starting attributes
+    fprintf (graph_file,
+    "digraph {\n\
+    rankdir=LR;\n\
+    pack=true;\n\
+    splines=ortho;\n\
+    node [ shape=record ];\n\
+    ");
+
+
+    for (int i = 0; i <= list->capacity; i ++)
+    {
+        if (list->buffer[i].status == ENGAGED)
+        {
+            fprintf (graph_file, "\n\tNode%d", i);
+            fprintf (graph_file, "[label = \"INDX: %d|NUM: %d|DATA: %d\";];\n", i, GetElemId (list->buffer, i), list->buffer[i].data);
+            fprintf (graph_file, "\tNode%d", i);
+            fprintf (graph_file, "[color = \"green\";];\n");
+        }
+        else if (list->buffer[i].status == FREE)
+        {
+            fprintf (graph_file, "\n\tNode%d", i);
+            fprintf (graph_file, "[label = \"INDX: %d|NUM: %d|DATA: %d\";];\n", i, GetElemId (list->free_head, i), list->buffer[i].data);
+            fprintf (graph_file, "\tNode%d", i);
+            fprintf (graph_file, "[color = \"red\";];\n");
+        }
+        else if (list->buffer[i].status == MASTER)
+        {
+            fprintf (graph_file, "\n\tNode%d", i);
+            fprintf (graph_file, "[label = \"INDX: %d|NUM: %d|DATA: %d\";];\n", i, GetElemId (list->buffer, i), list->buffer[i].data);
+            fprintf (graph_file, "\tNode%d", i);
+            fprintf (graph_file, "[color = \"purple\";];\n");
+        }
+    }
+
+    fprintf (graph_file, "\n");
+
+    for (int i = 0; i < list->capacity; i ++)
+        fprintf (graph_file, "\tNode%d -> Node%d[color = \"white\";];\n", i, i+1); //ordering elems as they are in ram
+
+    fprintf (graph_file, "\n");
+
+    for (int i = 0; i <= list->capacity; i++)
+    {
+        if (list->buffer[i].status == ENGAGED || list->buffer[i].status == MASTER)
+        {
+            int next_indx = list->buffer[i].next->index;
+            fprintf (graph_file, "\tNode%d -> Node%d [constraint = false;];\n", i, next_indx);
+        }
+        else 
+        {
+            int next_indx = list->buffer[i].next->index;
+            fprintf (graph_file, "\tNode%d -> Node%d [constraint = false;];\n", i, next_indx);
+        }
+    }
+
+    // while (counter < elem_num)
+    // {
+    //     int next = 0;
+
+    //     if (counter == elem_num - 1)
+    //         next = 0;
+    //     else 
+    //         next = counter + 1;
+
+    //     fprintf (graph_file, "\tNode%d -> Node%d\n", counter, next);
+    //     counter ++;
+    // }
+
+    
+
+    fprintf (graph_file, "}\n");
+
+    //while ();
+
+
+    return SUCCESS;
+}
+
+
 
 int ListInit (my_list* list, size_t elem_num)
 {
@@ -304,9 +433,8 @@ int ListInit (my_list* list, size_t elem_num)
     list->buffer[0].status = MASTER;
     list->buffer[0].next = list->buffer;
     list->buffer[0].prev = list->buffer;
-    //list->buffer[0].prev = NULL;
 
-    for (int i = 1; i < elem_num + 1; i++)
+    for (int i = 1; i <= elem_num; i++)
     {
         list->buffer[i].index = i;
         InsertFreeList (list, list->buffer + i);
@@ -327,3 +455,4 @@ int ListDestroy (my_list* list)
 
     return SUCCESS;
 }
+

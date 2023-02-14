@@ -566,8 +566,10 @@ int MakeListGreatAgain (my_list* list)
             indx ++;
         }
     }
+
     list_elem* old_buffer = list->buffer;
     list->buffer = new_list.buffer;
+    list->free_head = new_list.free_head;
 
     FREE (old_buffer);
 

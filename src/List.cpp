@@ -456,3 +456,120 @@ int ListDestroy (my_list* list)
     return SUCCESS;
 }
 
+
+
+//----------------------------------------New functions for linearization------------------------------//
+
+int DeleteFreeHead (my_list* list)
+{
+    list_elem* old_head = list->free_head;
+    list_elem* new_head = list->free_head->next;
+
+    new_head->prev = old_head->prev;
+    old_head->prev->next = new_head;
+    list->free_head = new_head;
+
+    old_head->next = NULL;
+    old_head->prev = NULL;
+
+    return SUCCESS;
+}
+
+int DeleteIndex (my_list* list, int indx)
+{
+    list_elem* elem = list->buffer + indx;
+
+    elem->prev->next = elem->next;
+    elem->next->prev = elem->prev;
+
+    elem->next = NULL;
+    elem->prev = NULL;
+
+    return SUCCESS;
+}
+
+list_elem* TakeFreeList_indx (my_list* list, int indx)
+{
+    list_elem* elem = list->buffer + indx;
+    assert (elem->status == FREE);
+
+    if (elem->next == elem) //only head left
+    {
+        list->free_head = NULL;
+        elem->next = NULL;
+        elem->prev = NULL;
+
+        return elem;
+    }
+
+    else if (elem == list->free_head)
+        DeleteFreeHead (list);
+
+    else 
+        DeleteIndex (list, indx);
+
+    return elem;
+}
+
+int ListInsertIndex (my_list* list, int index, list_data_t data)
+{
+    list_elem* new_to_add = TakeFreeList_indx (list, index);
+    new_to_add->status = ENGAGED;
+    list->size ++;
+
+    new_to_add->data = data;
+
+    InsertLeft (list->buffer, new_to_add);
+
+    return SUCCESS;
+}
+
+int ListDeleteIndex (my_list* list, int index)
+{
+    assert (list != NULL);
+    assert (list->buffer[index].status == ENGAGED);
+
+    if (list->capacity == 0)
+        return LIST_EMPTY;
+    
+    list_elem* del_elem = list->buffer + index; 
+
+    DeleteRight (del_elem->prev);
+    list->size --;
+
+    InsertFreeList (list, del_elem);
+    //ListResize(list);
+
+    return SUCCESS;
+}
+
+//---------------------------------------------------------------------------------------------------//
+
+
+int MakeListGreatAgain (my_list* list)
+{
+    assert (list != NULL);
+
+    my_list new_list = {};
+    ListInit (&new_list, list->capacity);
+
+    int indx = 1;
+
+    for (int i = 0; i <= list->capacity; i ++)
+    {
+        list_elem* elem = list->buffer + i;
+
+        if (elem->status == ENGAGED)
+        {
+            list_data_t data = elem->data;
+            ListInsertIndex (&new_list, indx, data);
+            indx ++;
+        }
+    }
+    list_elem* old_buffer = list->buffer;
+    list->buffer = new_list.buffer;
+
+    FREE (old_buffer);
+
+    return SUCCESS;
+}

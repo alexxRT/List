@@ -11,6 +11,11 @@ const int MASTER  = 3; // main list head
 static FILE* dump_file  = NULL; 
 static FILE* graph_file = NULL;
 
+#define CHECK_UP( lst_ptr ) lst_ptr->size == lst_ptr->capacity
+
+#define CHECK_DOWN( lst_ptr ) lst_ptr->size < (lst_ptr->capacity) / 4 && \
+lst_ptr->capacity / 2 >= lst_ptr->min_capacity
+
 
 // #define SET_NODE( elem_ptr, id )                                                                          \
 // fprintf (graph_file, "[label = \"Num: %d|indx: %d|data: %d\";];\n", id, elem_ptr->index, elem_ptr->data)  \
@@ -22,7 +27,7 @@ void PrintListElem (list_elem* elem);
 
 void InitDumpFile ()
 {
-    dump_file = fopen ("../sys/DUMP.txt", "a");
+    dump_file = stderr;//fopen ("../sys/DUMP.txt", "a");
     assert (dump_file != NULL);
 }
 
@@ -136,8 +141,6 @@ int InsertLeft (list_elem* dest, list_elem* elem)
 {
     list_elem* old_elem = dest->prev;
 
-    //PrintListElem (old_elem);
-
     dest->prev = elem;
     elem->next = dest;
     elem->prev = old_elem;
@@ -208,7 +211,7 @@ int InsertFreeList (my_list* list, list_elem* elem)
 
 int ListInsertRight (my_list* list, size_t id, list_data_t data)
 {
-    //ListResize (list);
+    ListResize (list);
 
     list_elem* new_to_add = TakeFreeList (list);
     new_to_add->status = ENGAGED;
@@ -225,7 +228,7 @@ int ListInsertRight (my_list* list, size_t id, list_data_t data)
 
 int ListInsertLeft (my_list* list, size_t id, list_data_t data)
 {
-    //ListResize (list);
+    ListResize (list);
 
     list_elem* new_to_add = TakeFreeList (list);
     new_to_add->status = ENGAGED;
@@ -252,7 +255,7 @@ int ListDelete (my_list* list, size_t id)
     list->size --;
 
     InsertFreeList (list, del_elem);
-    //ListResize(list);
+    ListResize(list);
 
     return SUCCESS;
 }
@@ -314,6 +317,8 @@ void PrintList (my_list* list, int list_type)
 
 int ListTextDump (my_list* list)
 {
+    fprintf (stderr, "%p\n", dump_file);
+
     fprintf (dump_file, "\n\n-------------------------LIST DUMP OCCURED-----------------------\n\n");
     fprintf (dump_file, "List address [%p]\n", list);
     fprintf (dump_file, "List head address [%p]\n", list->buffer);
@@ -427,6 +432,7 @@ int ListInit (my_list* list, size_t elem_num)
 
     list->buffer   = CALLOC (elem_num + 1, list_elem);
     list->capacity = elem_num;
+    list->min_capacity = elem_num;
     list->size     = 0;
     list->free_head = NULL;
 
@@ -513,6 +519,8 @@ list_elem* TakeFreeList_indx (my_list* list, int indx)
 
 int ListInsertIndex (my_list* list, int index, list_data_t data)
 {
+    ListResize (list);
+
     list_elem* new_to_add = TakeFreeList_indx (list, index);
     new_to_add->status = ENGAGED;
     list->size ++;
@@ -538,7 +546,7 @@ int ListDeleteIndex (my_list* list, int index)
     list->size --;
 
     InsertFreeList (list, del_elem);
-    //ListResize(list);
+    ListResize(list);
 
     return SUCCESS;
 }
@@ -554,17 +562,16 @@ int MakeListGreatAgain (my_list* list)
     ListInit (&new_list, list->capacity);
 
     int indx = 1;
+    list_elem* head = list->buffer;
+    list_elem* elem = head->next;
 
-    for (int i = 0; i <= list->capacity; i ++)
+    while (elem != head)
     {
-        list_elem* elem = list->buffer + i;
+        list_data_t data = elem->data;
+        ListInsertIndex (&new_list, indx, data);
 
-        if (elem->status == ENGAGED)
-        {
-            list_data_t data = elem->data;
-            ListInsertIndex (&new_list, indx, data);
-            indx ++;
-        }
+        elem = elem->next;
+        indx ++;
     }
 
     list_elem* old_buffer = list->buffer;
@@ -572,6 +579,75 @@ int MakeListGreatAgain (my_list* list)
     list->free_head = new_list.free_head;
 
     FREE (old_buffer);
+
+    return SUCCESS;
+}
+
+int ResizeUp (my_list* list)
+{
+    assert (list != NULL);
+
+    my_list new_list = {};
+    ListInit (&new_list, 2*list->capacity);
+
+    for (int i = 1; i <= list->capacity; i++)
+    {
+        list_elem* elem = list->buffer + i;
+        list_data_t data = elem->data;
+
+        ListInsertIndex (&new_list, i, data);
+    }
+
+    list->capacity = new_list.capacity;
+    list_elem* old_buffer = list->buffer;
+    list->buffer = new_list.buffer;
+    list->free_head = new_list.free_head;
+
+    FREE (old_buffer);
+
+
+    return SUCCESS;
+}
+
+int ResizeDown (my_list* list)
+{
+    assert (list != NULL);
+
+    my_list new_list = {};
+    ListInit (&new_list, list->capacity / 2);
+
+    for (int i = 1; i <= list->size; i ++)
+    {
+        list_elem* elem = list->buffer + i;
+        list_data_t data = elem->data;
+
+        ListInsertIndex (&new_list, i, data);
+    }
+
+    list->capacity = new_list.capacity;
+    list_elem* old_buffer = list->buffer;
+    list->buffer = new_list.buffer;
+    list->free_head = new_list.free_head;
+
+    FREE (old_buffer);
+
+    return SUCCESS;
+}
+
+int ListResize (my_list* list)
+{
+    assert (list != NULL);
+
+    if (CHECK_UP(list))
+    {
+        MakeListGreatAgain (list);
+        ResizeUp (list);
+    }
+    else if (CHECK_DOWN(list))
+    {
+        MakeListGreatAgain (list);
+        ResizeDown (list);
+    }
 
     return SUCCESS;
 }

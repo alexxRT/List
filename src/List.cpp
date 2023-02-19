@@ -17,11 +17,83 @@ static FILE* graph_file = NULL;
 lst_ptr->capacity / 2 >= lst_ptr->min_capacity
 
 
-// #define SET_NODE( elem_ptr, id )                                                                          \
-// fprintf (graph_file, "[label = \"Num: %d|indx: %d|data: %d\";];\n", id, elem_ptr->index, elem_ptr->data)  \
+//TO_DO:
 
-// #define SET_COLOR( elem_ptr, id, color)                    \
-// fprintf (graph_file, "[color = \"%s\";];\n", color)        \
+//write PrintErr function, that's only a quastion of time
+//ask Sasha about new cool ways to improve errors routine
+//complete loop valid functions
+//place all asserts on their places
+//do not forget about separate checks in
+//1) resize, when realloc returned invalid ptr
+//2) aaaand, functions that delete elem aka list underflow
+
+
+#ifdef DEBUG_VERSION //this custom assert will print error that happened and 'll exit function
+#define LIST_VALIDATE( lst_ptr )                                 \
+do{                                                              \
+    int ErrCode = ListValid (lst_ptr);                           \
+    if (ErrCode != SUCCESS)                                      \
+        {                                                        \
+            PrintErr (ErrCode, __LINE__, __func__);              \
+            return ErrCode;                                      \
+        }                                                        \
+}                                                                \
+while (0)                                                        \
+
+#else
+#define LIST_VALIDATE( lst_ptr ) void*(0)
+#endif
+
+
+int ListFieldsValid (my_list* list)
+{
+    if (!list)                       return LIST_NULL;
+    if (!list->buffer)               return DATA_NULL;
+    if (list->size > list->capacity) return LIST_OVERFLOW;
+    if (CheckSize (list))            return SIZE_WRONG;
+    if (list->capacity == 0)         return CAPACITY_INVALID; // can not create list for 0 elems, its non resizable otherwise
+}
+
+int EngagedListValid (my_list* list)
+{
+    //check if loop is safe and sound, no empty links 
+
+    //double check, forward and backward
+    //i store ptr, so they all should be valid   !!!
+    //before it, check if size has correct value !!!
+    //mark node where i started and compare where i ended
+    //if they are not the same, the loop is broken, taa daaaa
+
+    return SUCCESS;
+}
+
+int FreeListValid (my_list* list)
+{
+    //list->free_head;
+    //same here, as above!!!
+
+    return SUCCESS;
+}
+
+
+
+// how to store all error codes in one param ErrCode???
+int ListValid (my_list* list)
+{
+    int ErrCode = SUCCESS;
+
+    ErrCode = ListFieldsValid  (list);
+    if (ErrCode) return ErrCode;
+
+    ErrCode = EngagedListValid (list);
+    if (ErrCode) return ErrCode;
+
+    ErrCode = FreeListValid    (list);
+    if (ErrCode) return ErrCode;
+
+    return ErrCode;
+}
+
 
 void PrintListElem (list_elem* elem);
 
@@ -384,7 +456,7 @@ int ListGraphDump (my_list* list)
 
     for (int i = 0; i < list->capacity; i ++)
         fprintf (graph_file, "\tNode%d -> Node%d[color = \"white\";];\n", i, i+1); //ordering elems as they are in ram
-
+``
     fprintf (graph_file, "\n");
 
     for (int i = 0; i <= list->capacity; i++)

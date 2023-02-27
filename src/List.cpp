@@ -21,42 +21,86 @@ lst_ptr->capacity / 2 >= lst_ptr->min_capacity
 
 //write PrintErr function, that's only a quastion of time
 //ask Sasha about new cool ways to improve errors routine
-//complete loop valid functions
-//place all asserts on their places
-//do not forget about separate checks in
-//1) resize, when realloc returned invalid ptr
-//2) aaaand, functions that delete elem aka list underflow
 
+//improve efficiency of liniarization and resize functions:
+//i use new list initialization, for all these tasks - time consuming
+//its better to realloc what we have, but realloc changes memory location, and ptrs i store - become invalid
+// store only indexes of prev and next elems, this will help to solve this problem
+
+//devide it into separate files and do a Makefile for release and debug versions
+
+// PREV(el) NEXT(el) add macroses to make code more readable
+
+//#define DEBUG_VERSION
 
 #ifdef DEBUG_VERSION //this custom assert will print error that happened and 'll exit function
 #define LIST_VALIDATE( lst_ptr )                                 \
 do{                                                              \
-    int ErrCode = ListValid (lst_ptr);                           \
+    LIST_ERR_CODE ErrCode = ListValid (lst_ptr);                 \
     if (ErrCode != SUCCESS)                                      \
         {                                                        \
-            PrintErr (ErrCode, __LINE__, __func__);              \
+            /*PrintErr (ErrCode, __LINE__, __func__);*/          \
             return ErrCode;                                      \
         }                                                        \
 }                                                                \
 while (0)                                                        \
 
 #else
-#define LIST_VALIDATE( lst_ptr ) void*(0)
+#define LIST_VALIDATE( lst_ptr ) (void*)0
 #endif
 
 
-int ListFieldsValid (my_list* list)
+LIST_ERR_CODE ListFieldsValid (my_list* list)
 {
     if (!list)                       return LIST_NULL;
     if (!list->buffer)               return DATA_NULL;
     if (list->size > list->capacity) return LIST_OVERFLOW;
-    if (CheckSize (list))            return SIZE_WRONG;
-    if (list->capacity == 0)         return CAPACITY_INVALID; // can not create list for 0 elems, its non resizable otherwise
+    if (list->capacity <= 0)         return CAPACITY_INVALID; // can not create list for 0 elems, its not resizable otherwise
+
+    return SUCCESS;
 }
 
-int EngagedListValid (my_list* list)
+LIST_ERR_CODE EngagedListValid (my_list* list)
 {
-    //check if loop is safe and sound, no empty links 
+    //check if loop is safe and sound, no empty links
+
+    int num_elems = list->size;
+    int counter = 0;
+
+    for (int i = 0; i <= list->capacity; i ++)
+    {
+        if (list->buffer[i].status == ENGAGED)
+            counter ++;
+    }
+
+    if (num_elems != counter)
+        return WRONG_SIZE;
+    
+    list_elem* head = list->buffer;
+    list_elem* elem = head;
+
+    // it goes cloсkwise
+    for (int i = 0; i <= num_elems; i ++)
+    {
+        if (!elem->next || !elem->prev)
+            return NULL_LINK;
+        elem = elem->next;
+    }
+
+    if (elem != head)
+        return BROAKEN_LOOP;
+
+    //it goes counter-clockwise
+    for (int i = 0; i <= num_elems; i ++)
+    {
+        if (!elem->next || !elem->prev)
+            return NULL_LINK;
+        elem = elem->prev;
+    }
+
+    if (elem != head)
+        return BROAKEN_LOOP;
+
 
     //double check, forward and backward
     //i store ptr, so they all should be valid   !!!
@@ -67,10 +111,39 @@ int EngagedListValid (my_list* list)
     return SUCCESS;
 }
 
-int FreeListValid (my_list* list)
+LIST_ERR_CODE FreeListValid (my_list* list)
 {
-    //list->free_head;
     //same here, as above!!!
+
+    //free list is empty, nothing to check
+    int free_size = list->capacity - list->size;
+    if (!free_size)
+        return SUCCESS;
+
+    list_elem* head = list->free_head;
+    list_elem* elem = head;
+
+    // it goes cloсkwise
+    for (int i = 0; i < free_size; i ++)
+    {
+        if (!elem->next || !elem->prev)
+            return NULL_LINK;
+        elem = elem->next;
+    }
+
+    if (elem != head)
+        return BROAKEN_LOOP;
+
+    //it goes counter-clockwise
+    for (int i = 0; i < free_size; i ++)
+    {
+        if (!elem->next || !elem->prev)
+            return NULL_LINK;
+        elem = elem->prev;
+    }
+
+    if (elem != head)
+        return BROAKEN_LOOP;
 
     return SUCCESS;
 }
@@ -78,18 +151,37 @@ int FreeListValid (my_list* list)
 
 
 // how to store all error codes in one param ErrCode???
-int ListValid (my_list* list)
+LIST_ERR_CODE ListValid (my_list* list)
 {
-    int ErrCode = SUCCESS;
+    LIST_ERR_CODE ErrCode = SUCCESS;
 
     ErrCode = ListFieldsValid  (list);
-    if (ErrCode) return ErrCode;
+    if (ErrCode)
+//    {
+//      printf ("[]\n");
+        return ErrCode;
+//    }
+
+//  printf ("first check\n");
 
     ErrCode = EngagedListValid (list);
-    if (ErrCode) return ErrCode;
+    if (ErrCode) 
+//  {
+//      printf ("\n");
+//      return ErrCode;
+//  }
+    
+
+//   printf ("second check\n");
 
     ErrCode = FreeListValid    (list);
-    if (ErrCode) return ErrCode;
+    if (ErrCode) 
+//  {
+//      printf ("\n");
+        return ErrCode;
+//  }
+
+//  printf ("third check\n\n");
 
     return ErrCode;
 }
@@ -99,7 +191,7 @@ void PrintListElem (list_elem* elem);
 
 void InitDumpFile ()
 {
-    dump_file = stderr;//fopen ("../sys/DUMP.txt", "a");
+    dump_file = fopen ("../sys/DUMP.txt", "a");
     assert (dump_file != NULL);
 }
 
@@ -123,32 +215,6 @@ void DestroyGraphDumpFile ()
     graph_file = NULL;
 }
 
-int ListCheck(my_list* list, int stat)
-{
-    int counter = 0;
-
-    for (int i = 0; i <= list->capacity; i++)
-    {
-        if (list->buffer[i].status == stat)
-            counter ++;
-    }
-
-    return counter;
-}
-enum ERROR_CODES
-{
-    SUCCESS        = 0,
-    LIST_NULL      = 1,
-    DATA_NULL      = 2,
-    LIST_FULL      = 3,
-    LIST_EMPTY     = 4,
-    REALLOC_FAILED = 5,
-    INVALID_ID     = 6
-};
-
-// LEFT(el) add macroses
-
-
 list_elem* GetElem (my_list* list, size_t id)
 {
     list_elem* to_get = list->buffer;
@@ -161,8 +227,17 @@ list_elem* GetElem (my_list* list, size_t id)
     return to_get;
 }
 
-int GetElemId (list_elem* head, int index)
+int GetElemId (my_list* list, int index, int stat)
 {
+    LIST_VALIDATE (list);
+
+    list_elem* head = NULL;
+
+    if (stat == ENGAGED)
+        head = list->buffer;
+    else 
+        head = list->free_head;
+
     int counter = 0;
 
     if (index == head->index)
@@ -181,7 +256,7 @@ int GetElemId (list_elem* head, int index)
         counter++;
     }
 
-    return -1; //but it is not success :(( add error constant
+    return WRONG_INDX; // its only returned if no elem was not found
 }
 
 
@@ -243,7 +318,7 @@ list_elem* TakeFreeList (my_list* list)
 
     if (head->next == head) //only head left
     {
-        list->free_head = NULL;
+        list->free_head = list->buffer;
         head->next = NULL;
         head->prev = NULL;
 
@@ -269,7 +344,7 @@ int InsertFreeList (my_list* list, list_elem* elem)
     elem->status = FREE;
     elem->data = 0;
 
-    if (list->free_head == NULL) // no free elems
+    if (list->free_head == list->buffer) // no free elems
     {
         list->free_head = elem;   //initing free head
         elem->next = elem;        //cycling the list
@@ -281,8 +356,10 @@ int InsertFreeList (my_list* list, list_elem* elem)
     return SUCCESS;
 }
 
-int ListInsertRight (my_list* list, size_t id, list_data_t data)
+LIST_ERR_CODE ListInsertRight (my_list* list, size_t id, list_data_t data)
 {
+    LIST_VALIDATE (list);
+
     ListResize (list);
 
     list_elem* new_to_add = TakeFreeList (list);
@@ -294,12 +371,16 @@ int ListInsertRight (my_list* list, size_t id, list_data_t data)
     list_elem* dest = GetElem (list, id);
     InsertRight (dest, new_to_add);
 
+    LIST_VALIDATE (list);
+
     return SUCCESS;
 }
 
 
-int ListInsertLeft (my_list* list, size_t id, list_data_t data)
+LIST_ERR_CODE ListInsertLeft (my_list* list, size_t id, list_data_t data)
 {
+    LIST_VALIDATE (list);
+
     ListResize (list);
 
     list_elem* new_to_add = TakeFreeList (list);
@@ -311,15 +392,17 @@ int ListInsertLeft (my_list* list, size_t id, list_data_t data)
     list_elem* dest = GetElem (list, id);
     InsertLeft (dest, new_to_add);
 
+    LIST_VALIDATE (list);
+
     return SUCCESS;
 }
 
-int ListDelete (my_list* list, size_t id)
+LIST_ERR_CODE ListDelete (my_list* list, size_t id)
 {
-    assert (list != NULL);
+    LIST_VALIDATE (list);
 
     if (list->capacity == 0)
-        return LIST_EMPTY;
+        return LIST_UNDERFLOW;
     
     list_elem* del_elem = GetElem (list, id); 
 
@@ -328,6 +411,8 @@ int ListDelete (my_list* list, size_t id)
 
     InsertFreeList (list, del_elem);
     ListResize(list);
+
+    LIST_VALIDATE (list);
 
     return SUCCESS;
 }
@@ -343,8 +428,10 @@ void PrintListElem (list_elem* elem)
 }
 
 
-void PrintList (my_list* list, int list_type)
+LIST_ERR_CODE PrintList (my_list* list, int list_type)
 {
+    LIST_VALIDATE (list);
+
     if (list_type == ENGAGED)
     {
         list_elem* head =       list->buffer;
@@ -365,8 +452,8 @@ void PrintList (my_list* list, int list_type)
     {
         list_elem* head = list->free_head;
 
-        if (head == NULL)
-            return;
+        if (head == list->buffer)
+            return SUCCESS;
         
         int order_num = 1;
 
@@ -385,37 +472,42 @@ void PrintList (my_list* list, int list_type)
             debug_elem = debug_elem->next;
         }
     }
+
+    LIST_VALIDATE (list);
+
+    return SUCCESS;
 }
 
-int ListTextDump (my_list* list)
+LIST_ERR_CODE ListTextDump (my_list* list)
 {
-    fprintf (stderr, "%p\n", dump_file);
+    LIST_VALIDATE (list);
+    //fprintf (stderr, "%p\n", dump_file);
 
     fprintf (dump_file, "\n\n-------------------------LIST DUMP OCCURED-----------------------\n\n");
     fprintf (dump_file, "List address [%p]\n", list);
     fprintf (dump_file, "List head address [%p]\n", list->buffer);
 
-    fprintf   (dump_file, "Now in the list [%d/%d] elems are engaged\n" , list->size, list->capacity);
-    fprintf   (dump_file, "CHECKING...\n[%d] - after direct counting\n", ListCheck(list, ENGAGED));
+    fprintf   (dump_file, "Now in the list [%lu/%lu] elems are engaged\n" , list->size, list->capacity);
 
     fprintf   (dump_file, "listing of engaged elems:\n");
     PrintList (list, ENGAGED);
 
-    fprintf   (dump_file, "Now in the list [%d] elems are free\n", list->capacity - list->size);
-    fprintf   (dump_file, "CHECKING...\n[%d] - after direct counting\n", ListCheck(list, FREE));
+    fprintf   (dump_file, "Now in the list [%lu] elems are free\n", list->capacity - list->size);
 
     fprintf   (dump_file, "Listing of free elems:\n");
     PrintList (list, FREE);
 
     fprintf   (dump_file, "\n\n-------------------------LIST DUMP FINISHED-----------------------\n\n");
 
+    LIST_VALIDATE (list);
+
     return SUCCESS;    
 }
 
 
-int ListGraphDump (my_list* list)
+LIST_ERR_CODE ListGraphDump (my_list* list)
 {
-    //dump of engaged elems
+    LIST_VALIDATE (list);
 
     //initilizing starting attributes
     fprintf (graph_file,
@@ -432,21 +524,21 @@ int ListGraphDump (my_list* list)
         if (list->buffer[i].status == ENGAGED)
         {
             fprintf (graph_file, "\n\tNode%d", i);
-            fprintf (graph_file, "[label = \"INDX: %d|NUM: %d|DATA: %d\";];\n", i, GetElemId (list->buffer, i), list->buffer[i].data);
+            fprintf (graph_file, "[label = \"INDX: %d|NUM: %d|DATA: %d\";];\n", i, GetElemId (list, i, ENGAGED), list->buffer[i].data);
             fprintf (graph_file, "\tNode%d", i);
             fprintf (graph_file, "[color = \"green\";];\n");
         }
         else if (list->buffer[i].status == FREE)
         {
             fprintf (graph_file, "\n\tNode%d", i);
-            fprintf (graph_file, "[label = \"INDX: %d|NUM: %d|DATA: %d\";];\n", i, GetElemId (list->free_head, i), list->buffer[i].data);
+            fprintf (graph_file, "[label = \"INDX: %d|NUM: %d|DATA: %d\";];\n", i, GetElemId (list, i, FREE), list->buffer[i].data);
             fprintf (graph_file, "\tNode%d", i);
             fprintf (graph_file, "[color = \"red\";];\n");
         }
         else if (list->buffer[i].status == MASTER)
         {
             fprintf (graph_file, "\n\tNode%d", i);
-            fprintf (graph_file, "[label = \"INDX: %d|NUM: %d|DATA: %d\";];\n", i, GetElemId (list->buffer, i), list->buffer[i].data);
+            fprintf (graph_file, "[label = \"INDX: %d|NUM: %d|DATA: %d\";];\n", i, GetElemId (list, i, ENGAGED), list->buffer[i].data);
             fprintf (graph_file, "\tNode%d", i);
             fprintf (graph_file, "[color = \"purple\";];\n");
         }
@@ -456,7 +548,7 @@ int ListGraphDump (my_list* list)
 
     for (int i = 0; i < list->capacity; i ++)
         fprintf (graph_file, "\tNode%d -> Node%d[color = \"white\";];\n", i, i+1); //ordering elems as they are in ram
-``
+
     fprintf (graph_file, "\n");
 
     for (int i = 0; i <= list->capacity; i++)
@@ -473,40 +565,24 @@ int ListGraphDump (my_list* list)
         }
     }
 
-    // while (counter < elem_num)
-    // {
-    //     int next = 0;
-
-    //     if (counter == elem_num - 1)
-    //         next = 0;
-    //     else 
-    //         next = counter + 1;
-
-    //     fprintf (graph_file, "\tNode%d -> Node%d\n", counter, next);
-    //     counter ++;
-    // }
-
-    
-
     fprintf (graph_file, "}\n");
 
-    //while ();
-
+    LIST_VALIDATE (list);
 
     return SUCCESS;
 }
 
 
 
-int ListInit (my_list* list, size_t elem_num)
+LIST_ERR_CODE ListInit (my_list* list, size_t elem_num)
 {
     assert (list != NULL);
 
-    list->buffer   = CALLOC (elem_num + 1, list_elem);
-    list->capacity = elem_num;
+    list->buffer    = CALLOC (elem_num + 1, list_elem);
+    list->free_head = list->buffer;
+    list->capacity  = elem_num;
     list->min_capacity = elem_num;
     list->size     = 0;
-    list->free_head = NULL;
 
     list->buffer[0].status = MASTER;
     list->buffer[0].next = list->buffer;
@@ -515,18 +591,21 @@ int ListInit (my_list* list, size_t elem_num)
     for (int i = 1; i <= elem_num; i++)
     {
         list->buffer[i].index = i;
-        InsertFreeList (list, list->buffer + i);
+        int err_code = InsertFreeList (list, list->buffer + i);
+        //printf ("[err_code is %d]\n\n", err_code);
     }
+
+    LIST_VALIDATE (list);
 
     return SUCCESS;
 }
 
-int ListDestroy (my_list* list)
+LIST_ERR_CODE ListDestroy (my_list* list)
 {
-    assert (list != NULL);
+    LIST_VALIDATE (list);
 
-    list->capacity = 0;
-    list->size = 0;
+    list->capacity  = 0;
+    list->size      = 0;
     list->free_head = NULL;
 
     FREE (list->buffer);
@@ -589,8 +668,10 @@ list_elem* TakeFreeList_indx (my_list* list, int indx)
     return elem;
 }
 
-int ListInsertIndex (my_list* list, int index, list_data_t data)
+LIST_ERR_CODE ListInsertIndex (my_list* list, int index, list_data_t data)
 {
+    LIST_VALIDATE (list);
+
     ListResize (list);
 
     list_elem* new_to_add = TakeFreeList_indx (list, index);
@@ -601,16 +682,18 @@ int ListInsertIndex (my_list* list, int index, list_data_t data)
 
     InsertLeft (list->buffer, new_to_add);
 
+    LIST_VALIDATE (list);
+
     return SUCCESS;
 }
 
-int ListDeleteIndex (my_list* list, int index)
+LIST_ERR_CODE ListDeleteIndex (my_list* list, int index)
 {
-    assert (list != NULL);
+    LIST_VALIDATE (list);
     assert (list->buffer[index].status == ENGAGED);
 
     if (list->capacity == 0)
-        return LIST_EMPTY;
+        return LIST_UNDERFLOW;
     
     list_elem* del_elem = list->buffer + index; 
 
@@ -620,15 +703,14 @@ int ListDeleteIndex (my_list* list, int index)
     InsertFreeList (list, del_elem);
     ListResize(list);
 
+    LIST_VALIDATE (list);
+
     return SUCCESS;
 }
 
-//---------------------------------------------------------------------------------------------------//
-
-
-int MakeListGreatAgain (my_list* list)
+LIST_ERR_CODE MakeListGreatAgain (my_list* list)
 {
-    assert (list != NULL);
+    LIST_VALIDATE (list);
 
     my_list new_list = {};
     ListInit (&new_list, list->capacity);
@@ -652,12 +734,18 @@ int MakeListGreatAgain (my_list* list)
 
     FREE (old_buffer);
 
+    LIST_VALIDATE (list);
+
     return SUCCESS;
 }
 
-int ResizeUp (my_list* list)
+//---------------------------------------------------------------------------------------------------//
+
+//------------------------------------------RESIZE FUNCTIONS-----------------------------------------//
+
+LIST_ERR_CODE ResizeUp (my_list* list)
 {
-    assert (list != NULL);
+    LIST_VALIDATE (list);
 
     my_list new_list = {};
     ListInit (&new_list, 2*list->capacity);
@@ -677,13 +765,14 @@ int ResizeUp (my_list* list)
 
     FREE (old_buffer);
 
+    LIST_VALIDATE (list);
 
     return SUCCESS;
 }
 
-int ResizeDown (my_list* list)
+LIST_ERR_CODE ResizeDown (my_list* list)
 {
-    assert (list != NULL);
+    LIST_VALIDATE (list);
 
     my_list new_list = {};
     ListInit (&new_list, list->capacity / 2);
@@ -703,12 +792,14 @@ int ResizeDown (my_list* list)
 
     FREE (old_buffer);
 
+    LIST_VALIDATE (list);
+
     return SUCCESS;
 }
 
-int ListResize (my_list* list)
+LIST_ERR_CODE ListResize (my_list* list)
 {
-    assert (list != NULL);
+    LIST_VALIDATE (list);
 
     if (CHECK_UP(list))
     {
@@ -721,5 +812,9 @@ int ListResize (my_list* list)
         ResizeDown (list);
     }
 
+    LIST_VALIDATE (list);
+
     return SUCCESS;
 }
+
+//----------------------------------------------------------------------------------------------------------------//

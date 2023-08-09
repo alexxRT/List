@@ -1,6 +1,6 @@
-#include "../lib/Memory.h"
-#include "../lib/List.h"
-#include "../lib/ListDebug.h"
+#include "memory.h"
+#include "list.h"
+#include "list_debug.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
@@ -12,15 +12,6 @@
 lst_ptr->capacity / 2 >= lst_ptr->min_capacity
 
 //TO_DO:
-
-//ask Sasha about new cool ways to improve errors routine
-
-//improve efficiency of liniarization and resize functions:
-//i use new list initialization, for all these tasks - time consuming
-//its better to realloc what we have, but realloc changes memory location, and ptrs i store - become invalid
-// store only indexes of prev and next elems, this will help to solve this problem
-
-
 // PREV(el) NEXT(el) add macroses to make code more readable
 
 int        InsertFreeList (my_list* list, list_elem* elem);
@@ -42,7 +33,7 @@ LIST_ERR_CODE ListInit (my_list* list, size_t elem_num)
     list->buffer[0].next = list->buffer;
     list->buffer[0].prev = list->buffer;
 
-    for (int i = 1; i <= elem_num; i++)
+    for (size_t i = 1; i <= elem_num; i++)
     {
         list->buffer[i].index = i;
         int err_code = InsertFreeList (list, list->buffer + i);
@@ -72,7 +63,7 @@ list_elem* GetElem (my_list* list, size_t id) //Gives elem by his order number
 {
     list_elem* to_get = list->buffer;
 
-    for (int i = 0; i < id; i ++)
+    for (size_t i = 0; i < id; i ++)
     {
         to_get = to_get->next;
     }
@@ -262,7 +253,7 @@ int DeleteIndex (my_list* list, int indx);
 list_elem* TakeFreeList_indx (my_list* list, int indx);
 
 
-LIST_ERR_CODE ListInsertIndex (my_list* list, int index, list_data_t data)
+LIST_ERR_CODE ListInsertIndex (my_list* list, size_t index, list_data_t data)
 {
     LIST_VALIDATE (list);
 
@@ -284,7 +275,7 @@ LIST_ERR_CODE ListInsertIndex (my_list* list, int index, list_data_t data)
     return SUCCESS;
 }
 
-LIST_ERR_CODE ListDeleteIndex (my_list* list, int index)
+LIST_ERR_CODE ListDeleteIndex (my_list* list, size_t index)
 {
     LIST_VALIDATE (list);
     
@@ -415,7 +406,7 @@ LIST_ERR_CODE ResizeUp (my_list* list)
     my_list new_list = {};
     ListInit (&new_list, 2*list->capacity);
 
-    for (int i = 1; i <= list->capacity; i++)
+    for (size_t i = 1; i <= list->capacity; i++)
     {
         list_elem* elem = list->buffer + i;
         list_data_t data = elem->data;
@@ -442,7 +433,7 @@ LIST_ERR_CODE ResizeDown (my_list* list)
     my_list new_list = {};
     ListInit (&new_list, list->capacity / 2);
 
-    for (int i = 1; i <= list->size; i ++)
+    for (size_t i = 1; i <= list->size; i ++)
     {
         list_elem* elem = list->buffer + i;
         list_data_t data = elem->data;

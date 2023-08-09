@@ -1,6 +1,6 @@
-#include "../lib/Memory.h"
-#include "../lib/List.h"
-#include "../lib/ListDebug.h"
+#include "memory.h"
+#include "list.h"
+#include "list_debug.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
@@ -14,9 +14,9 @@ static FILE* graph_file = NULL;
 static FILE* log_file   = NULL; 
 
 
-void InitLogFile ()
+void InitLogFile (const char* const log_path)
 {
-    log_file = fopen ("../sys/LOG.txt", "a");
+    log_file = fopen (log_path, "a");
     assert (log_file != NULL);
 }
 
@@ -27,9 +27,9 @@ void DestroyLogFile ()
     log_file = NULL;
 }
 
-void InitDumpFile ()
+void InitDumpFile (const char* const dump_path)
 {
-    dump_file = fopen ("../sys/DUMP.txt", "a");
+    dump_file = fopen (dump_path, "a");
     assert (dump_file != NULL);
 }
 
@@ -40,9 +40,9 @@ void DestroyDumpFile ()
     dump_file = NULL;
 }
 
-void InitGraphDumpFile ()
+void InitGraphDumpFile (const char* const graph_dump_path)
 {
-    graph_file = fopen ("../graphviz/test.gv", "w");
+    graph_file = fopen (graph_dump_path, "w");
     assert (graph_file != NULL);
 }
 
@@ -97,6 +97,10 @@ void PrintErr (my_list* list, LIST_ERR_CODE ErrCode, const int line, const char*
             break;
         case HEAD_DELEATE:
             fprintf (log_file, "LIST [%p] Trying to delete HEAD! ", list);
+            break;
+        case SUCCESS:
+            fprintf (log_file, "LIST [%p] is consistant!\n\n", list);
+            break;
         default:
         {
             fprintf (log_file, "Unexpected error code is %d\n", ErrCode);
@@ -104,7 +108,9 @@ void PrintErr (my_list* list, LIST_ERR_CODE ErrCode, const int line, const char*
         }
     }
 
-    fprintf (log_file, "error happend in function [%s()] and on the line [%d]\n", func, line);
+    if (ErrCode != SUCCESS)
+        fprintf (log_file, "error happend in function [%s()] and on the line [%d]\n", func, line);
+
 }
 
 //------------------------------------------------------------------------------------------------------------------------//
@@ -153,7 +159,7 @@ LIST_ERR_CODE EngagedListValid (my_list* list) //check if loop is safe and sound
     int num_elems = list->size;
     int counter = 0;
 
-    for (int i = 0; i <= list->capacity; i ++)
+    for (size_t i = 0; i <= list->capacity; i ++)
     {
         if (list->buffer[i].status == ENGAGED)
             counter ++;
@@ -279,7 +285,7 @@ LIST_ERR_CODE ListGraphDump (my_list* list)
 {
     LIST_VALIDATE (list);
 
-    assert (dump_file != NULL && "Please init GraphDump file");
+    assert (graph_file != NULL && "Please init GraphDump file");
 
     //initilizing starting attributes
     fprintf (graph_file,
@@ -291,7 +297,7 @@ LIST_ERR_CODE ListGraphDump (my_list* list)
     ");
 
 
-    for (int i = 0; i <= list->capacity; i ++) //initing each node, gives it color, data, order num
+    for (size_t i = 0; i <= list->capacity; i ++) //initing each node, gives it color, data, order num
     {
         if (list->buffer[i].status == ENGAGED)
         {
@@ -300,9 +306,9 @@ LIST_ERR_CODE ListGraphDump (my_list* list)
             if (id == WRONG_ID)
                 return WRONG_ID;
 
-            fprintf (graph_file, "\n\tNode%d", i);
-            fprintf (graph_file, "[label = \"INDX: %d|NUM: %d|DATA: %d\";];\n", i, id, list->buffer[i].data);
-            fprintf (graph_file, "\tNode%d", i);
+            fprintf (graph_file, "\n\tNode%zu", i);
+            fprintf (graph_file, "[label = \"INDX: %zu|NUM: %d|DATA: %d\";];\n", i, id, list->buffer[i].data);
+            fprintf (graph_file, "\tNode%zu", i);
             fprintf (graph_file, "[color = \"green\";];\n");
         }
         else if (list->buffer[i].status == FREE)
@@ -312,9 +318,9 @@ LIST_ERR_CODE ListGraphDump (my_list* list)
             if (id == WRONG_ID)
                 return WRONG_ID;
 
-            fprintf (graph_file, "\n\tNode%d", i);
-            fprintf (graph_file, "[label = \"INDX: %d|NUM: %d|DATA: %d\";];\n", i, id, list->buffer[i].data);
-            fprintf (graph_file, "\tNode%d", i);
+            fprintf (graph_file, "\n\tNode%zu", i);
+            fprintf (graph_file, "[label = \"INDX: %zu|NUM: %d|DATA: %d\";];\n", i, id, list->buffer[i].data);
+            fprintf (graph_file, "\tNode%zu", i);
             fprintf (graph_file, "[color = \"red\";];\n");
         }
         else if (list->buffer[i].status == MASTER)
@@ -324,35 +330,36 @@ LIST_ERR_CODE ListGraphDump (my_list* list)
             if (id == WRONG_ID)
                 return WRONG_ID;
 
-            fprintf (graph_file, "\n\tNode%d", i);
-            fprintf (graph_file, "[label = \"INDX: %d|NUM: %d|DATA: %d\";];\n", i, id, list->buffer[i].data);
-            fprintf (graph_file, "\tNode%d", i);
+            fprintf (graph_file, "\n\tNode%zu", i);
+            fprintf (graph_file, "[label = \"INDX: %zu|NUM: %d|DATA: %d\";];\n", i, id, list->buffer[i].data);
+            fprintf (graph_file, "\tNode%zu", i);
             fprintf (graph_file, "[color = \"purple\";];\n");
         }
     }
 
     fprintf (graph_file, "\n");
 
-    for (int i = 0; i < list->capacity; i ++)
-        fprintf (graph_file, "\tNode%d -> Node%d[color = \"white\";];\n", i, i+1); //ordering elems as they are in ram
+    for (size_t i = 0; i < list->capacity; i ++)
+        fprintf (graph_file, "\tNode%zu -> Node%zu[color = \"white\";];\n", i, i+1); //ordering elems as they are in ram
 
     fprintf (graph_file, "\n");
 
-    for (int i = 0; i <= list->capacity; i++)
+    for (size_t i = 0; i <= list->capacity; i++)
     {
         if (list->buffer[i].status == ENGAGED || list->buffer[i].status == MASTER)
         {
             int next_indx = list->buffer[i].next->index;
-            fprintf (graph_file, "\tNode%d -> Node%d [constraint = false;];\n", i, next_indx);
+            fprintf (graph_file, "\tNode%zu -> Node%d [constraint = false;];\n", i, next_indx);
         }
         else 
         {
             int next_indx = list->buffer[i].next->index;
-            fprintf (graph_file, "\tNode%d -> Node%d [constraint = false;];\n", i, next_indx);
+            fprintf (graph_file, "\tNode%zu -> Node%d [constraint = false;];\n", i, next_indx);
         }
     }
 
     fprintf (graph_file, "}\n");
+
 
     LIST_VALIDATE (list);
 

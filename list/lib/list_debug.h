@@ -2,11 +2,11 @@
 #define LIST_DEBUG
 
 
-void InitLogFile ();
+void InitLogFile (const char* const log_path);
 void DestroyLogFile ();
-void InitDumpFile ();
+void InitDumpFile (const char* const dump_path);
 void DestroyDumpFile ();
-void InitGraphDumpFile ();
+void InitGraphDumpFile (const char* const graph_dump_path);
 void DestroyGraphDumpFile ();
 
 LIST_ERR_CODE ListTextDump (my_list* list);

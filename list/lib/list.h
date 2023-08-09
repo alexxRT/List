@@ -57,8 +57,8 @@ LIST_ERR_CODE ListInsertRight (my_list* list, size_t id, list_data_t data);
 LIST_ERR_CODE ListInsertLeft  (my_list* list, size_t id, list_data_t data);
 LIST_ERR_CODE ListDelete (my_list* list, size_t id);
 
-LIST_ERR_CODE ListInsertIndex (my_list* list, int index, list_data_t data);
-LIST_ERR_CODE ListDeleteIndex (my_list* list, int index);
+LIST_ERR_CODE ListInsertIndex (my_list* list, size_t index, list_data_t data);
+LIST_ERR_CODE ListDeleteIndex (my_list* list, size_t index);
 
 LIST_ERR_CODE ListResize (my_list* list);
 

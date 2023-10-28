@@ -7,15 +7,18 @@
 
 
 #define CHECK_UP( lst_ptr ) lst_ptr->size == lst_ptr->capacity
-
 #define CHECK_DOWN( lst_ptr ) lst_ptr->size < (lst_ptr->capacity) / 4 && \
 lst_ptr->capacity / 2 >= lst_ptr->min_capacity
 
-//TO_DO:
-// PREV(el) NEXT(el) add macroses to make code more readable
+#define ELEM( lst, pos ) (lst->buffer  + pos)
+#define NEXT( lst, pos ) (lst->buffer + (lst->buffer + pos)->next)
+#define PREV( lst, pos ) (lst->buffer + (lst->buffer + pos)->prev) 
 
-int        InsertFreeList (my_list* list, list_elem* elem);
-list_elem* TakeFreeList   (my_list* list);
+static const int HEAD_ID = 0;
+
+
+int        InsertFreeList (my_list* list, size_t elem);
+size_t     TakeFreeList   (my_list* list);
 
 //------------------------------------------------------INIT/DESTROY---------------------------------------------------//
 
@@ -23,20 +26,20 @@ LIST_ERR_CODE ListInit (my_list* list, size_t elem_num)
 {
     assert (list != NULL);
 
-    list->buffer    = CALLOC (elem_num + 1, list_elem);
-    list->free_head = list->buffer;
+    list->buffer = CALLOC (elem_num + 1, list_elem);
+    list->free_head_id = HEAD_ID;
     list->capacity  = elem_num;
     list->min_capacity = elem_num;
     list->size     = 0;
 
-    list->buffer[0].status = MASTER;
-    list->buffer[0].next = list->buffer;
-    list->buffer[0].prev = list->buffer;
+    list->buffer[0].status = NODE_STATUS::MASTER;
+    list->buffer[0].next = HEAD_ID;
+    list->buffer[0].prev = HEAD_ID;
 
     for (size_t i = 1; i <= elem_num; i++)
     {
         list->buffer[i].index = i;
-        int err_code = InsertFreeList (list, list->buffer + i);
+        int err_code = InsertFreeList (list, i);
     }
 
     LIST_VALIDATE (list);
@@ -50,7 +53,7 @@ LIST_ERR_CODE ListDestroy (my_list* list)
 
     list->capacity  = 0;
     list->size      = 0;
-    list->free_head = NULL;
+    list->free_head_id = 0;
 
     FREE (list->buffer);
 
@@ -59,80 +62,92 @@ LIST_ERR_CODE ListDestroy (my_list* list)
 
 //---------------------------------------------------------------------------------------------------------------------//
 
-list_elem* GetElem (my_list* list, size_t id) //Gives elem by his order number
+size_t GetElem (my_list* list, size_t pos) //Gives elem by his order number
 {
-    list_elem* to_get = list->buffer;
+    size_t to_get = 0;
+    size_t i = 0;
 
-    for (size_t i = 0; i < id; i ++)
-    {
-        to_get = to_get->next;
-    }
 
+    for (; i < pos; i ++)    
+        to_get = NEXT(list, to_get)->index;
+
+    //if element position is out of list size 
+    //we do not want to go round the list and looking for elem
+    if (i >= list->size)
+        return -1;
+    
     return to_get;
 }
 
 //------------------------------------------INSERT/DELETE TO/FROM LOGIC ELEM'S POSITION--------------------------------//
 
-int InsertRight (list_elem* dest, list_elem* elem);
-int DeleteRight (list_elem* dest);
-int InsertLeft (list_elem* dest, list_elem* elem);
-int DeleteLeft (list_elem* dest);
+int InsertRight (my_list* list, size_t elem, size_t pos);
+int DeleteRight (my_list* list, size_t pos);
+int InsertLeft  (my_list* list, size_t elem, size_t pos);
+int DeleteLeft  (my_list* list, size_t pos);
 
+// head ---> node_1 ---> node_2 ---> ....
+//  0          1           2         ....
+//inserting with position 0 everytime will couse inserting in tail
 
-LIST_ERR_CODE ListInsertRight (my_list* list, size_t id, list_data_t data)
-{
+LIST_ERR_CODE ListInsertHead(my_list* list, list_data_t data) {
     LIST_VALIDATE (list);
 
     ListResize (list);
 
-    list_elem* new_to_add = TakeFreeList (list);
-    new_to_add->status = ENGAGED;
+    size_t new_to_add = TakeFreeList (list);
+    ELEM(list, new_to_add)->status = NODE_STATUS::ENGAGED;
     list->size ++;
 
-    new_to_add->data = data;
+    ELEM(list, new_to_add)->data = data;
 
-    list_elem* dest = GetElem (list, id);
-    InsertRight (dest, new_to_add);
+    InsertRight(list, HEAD_ID, new_to_add);
 
-    LIST_VALIDATE (list);
+    LIST_VALIDATE(list);
 
-    return SUCCESS;
+    return LIST_ERR_CODE::SUCCESS;
 }
 
-
-LIST_ERR_CODE ListInsertLeft (my_list* list, size_t id, list_data_t data)
-{
+LIST_ERR_CODE ListInsert (my_list* list, size_t pos, list_data_t data) {
     LIST_VALIDATE (list);
 
     ListResize (list);
 
-    list_elem* new_to_add = TakeFreeList (list);
-    new_to_add->status = ENGAGED;
+    size_t new_to_add = TakeFreeList (list);
+    ELEM(list, new_to_add)->status = NODE_STATUS::ENGAGED;
+    ELEM(list, new_to_add)->data = data;
+
     list->size ++;
 
-    new_to_add->data = data;
+    size_t dest = GetElem (list, pos);
+    size_t rel_dest = ELEM(list, dest)->prev;
 
-    list_elem* dest = GetElem (list, id);
-    InsertLeft (dest, new_to_add);
+    if (dest != LIST_ERR_CODE::WRONG_POS) {
+        InsertRight (list, rel_dest, new_to_add);
+        LIST_VALIDATE (list);
 
-    LIST_VALIDATE (list);
+        return LIST_ERR_CODE::SUCCESS;
+    }
 
-    return SUCCESS;
+    return LIST_ERR_CODE::WRONG_POS;
 }
 
-LIST_ERR_CODE ListDelete (my_list* list, size_t id)
-{
+
+LIST_ERR_CODE ListDelete (my_list* list, size_t pos) {
     LIST_VALIDATE (list);
 
     if (list->capacity == 0)
         return LIST_UNDERFLOW;
     
-    list_elem* del_elem = GetElem (list, id); 
+    size_t del_elem = GetElem (list, pos);
 
-    if (del_elem == list->buffer)
+    if (del_elem == -1)
+        return WRONG_POS;
+
+    if (del_elem == HEAD_ID)
         return HEAD_DELEATE;
 
-    DeleteRight (del_elem->prev);
+    DeleteRight (list, pos);
     list->size --;
 
     InsertFreeList (list, del_elem);
@@ -144,99 +159,86 @@ LIST_ERR_CODE ListDelete (my_list* list, size_t id)
 }
 
 
-
-int InsertRight (list_elem* dest, list_elem* elem)
-{
-    list_elem* old_elem = dest->next;
-
-    dest->next     = elem;
-    elem->prev     = dest;
-    elem->next     = old_elem;
-    old_elem->prev = elem;
+int InsertRight (my_list* list, size_t elem, size_t pos) {
+    size_t old_elem            = ELEM(list, pos)->next;
+    ELEM(list, pos )->next     = elem;
+    ELEM(list, elem)->prev     = ELEM(list, pos)->index;
+    ELEM(list, elem)->next     = old_elem;
+    ELEM(list, old_elem)->prev = elem;
 
     return SUCCESS;
 }
 
-int DeleteRight (list_elem* dest)
-{
-    list_elem* del_elem = dest->next;
-    dest->next = del_elem->next;
-    del_elem->next->prev = dest;
+int DeleteRight (my_list* list, size_t elem) {
+    size_t del_elem = ELEM(list, elem)->next;
+    ELEM(list, elem)->next = ELEM(list, del_elem)->next;
+    NEXT(list, del_elem)->prev = elem;
 
-    del_elem->prev = NULL;
-    del_elem->next = NULL;
-
-    return SUCCESS;
-}
-
-int InsertLeft (list_elem* dest, list_elem* elem)
-{
-    list_elem* old_elem = dest->prev;
-
-    dest->prev = elem;
-    elem->next = dest;
-    elem->prev = old_elem;
-    old_elem->next = elem;
+    ELEM(list, del_elem)->prev = 0;
+    ELEM(list, del_elem)->next = 0;
 
     return SUCCESS;
 }
 
-int DeleteLeft (list_elem* dest)
-{
-    list_elem* del_elem = dest->prev;
-    dest->prev = del_elem->prev;
-    del_elem->prev->next = dest;
+int InsertLeft (my_list* list, size_t elem, size_t pos) {
+    size_t old_elem            = ELEM(list, pos)->prev;
+    ELEM(list, pos )->prev     = elem;
+    ELEM(list, elem)->next     = ELEM(list, pos)->index;
+    ELEM(list, elem)->prev     = old_elem;
+    ELEM(list, old_elem)->next = elem;
 
-    del_elem->next = NULL;
-    del_elem->prev = NULL;
+    return SUCCESS;
+}
+
+int DeleteLeft (my_list* list, size_t elem) {
+    size_t del_elem = ELEM(list, elem)->prev;
+    ELEM(list, elem)->prev = ELEM(list, del_elem)->prev;
+    PREV(list, del_elem)->next = elem;
+
+    ELEM(list, del_elem)->prev = 0;
+    ELEM(list, del_elem)->next = 0;
 
     return SUCCESS;
 }
 
 
-list_elem* TakeFreeList (my_list* list)
-{
-    assert (list            != NULL);
-    assert (list->free_head != NULL);
+size_t TakeFreeList (my_list* list) {
+    assert (list != NULL);
 
-    list_elem* head = list->free_head;
+    list_elem* head = ELEM(list, list->free_head_id);
 
-    if (head->next == head) //only head left
+    if (head->next == HEAD_ID) //only head left
     {
-        list->free_head = list->buffer;
-        head->next = NULL;
-        head->prev = NULL;
+        list->free_head_id = HEAD_ID;
+        head->next = 0;
+        head->prev = 0;
 
-        return head;
-    }
-    else 
-    {
-        list_elem* pop_elem = head->next;
-        DeleteRight (head);
-
-        return pop_elem;
+        return head->index;
     }
 
-    return NULL;
+    size_t pop_elem = head->next;
+    DeleteRight (list, head->index);
+
+    return pop_elem;
 }
 
 
-int InsertFreeList (my_list* list, list_elem* elem)
+int InsertFreeList (my_list* list, size_t elem)
 {
     assert (list != NULL);
     assert (elem != NULL);
 
-    elem->status = FREE;
-    elem->data = 0;
+    ELEM(list, elem)->status = NODE_STATUS::FREE;
+    ELEM(list, elem)->data = 0;
 
-    if (list->free_head == list->buffer) // no free elems
+    if (list->free_head_id == HEAD_ID) // no free elems
     {
-        list->free_head = elem;   //initing free head
-        elem->next = elem;        //cycling the list
-        elem->prev = elem;
+        list->free_head_id     = ELEM(list, elem)->index;        //initing free head
+        ELEM(list, elem)->next = ELEM(list, elem)->index;        //cycling the list
+        ELEM(list, elem)->prev = ELEM(list, elem)->index;
     }
     else
-        InsertRight (list->free_head, elem);
+        InsertRight (list, list->free_head_id, elem);
 
     return SUCCESS;
 }
@@ -263,7 +265,7 @@ LIST_ERR_CODE ListInsertIndex (my_list* list, size_t index, list_data_t data)
     ListResize (list);
 
     list_elem* new_to_add = TakeFreeList_indx (list, index);
-    new_to_add->status = ENGAGED;
+    new_to_add->status = NODE_STATUS::ENGAGED;
     list->size ++;
 
     new_to_add->data = data;
@@ -280,18 +282,19 @@ LIST_ERR_CODE ListDeleteIndex (my_list* list, size_t index)
     LIST_VALIDATE (list);
     
     if (index > list->capacity ||
-        list->buffer[index].status == FREE)
+        list->buffer[index].status == NODE_STATUS::FREE)
         return WRONG_INDX;
 
     if (list->capacity == 0)
         return LIST_UNDERFLOW;
 
-    if (index == 0)
+    if (index == HEAD_ID)
         return HEAD_DELEATE;
     
-    list_elem* del_elem = list->buffer + index; 
+    size_t rel_pos  = ELEM(list, index)->prev;
+    size_t del_elem = ELEM(list, index)->index; 
 
-    DeleteRight (del_elem->prev);
+    DeleteRight (list, rel_pos);
     list->size --;
 
     InsertFreeList (list, del_elem);
@@ -393,7 +396,6 @@ LIST_ERR_CODE MakeListGreatAgain (my_list* list)
 
 
 
-//---------------------------------------------------------------------------------------------------//
 
 
 

@@ -6,32 +6,31 @@
 
 typedef int list_data_t;
 
-typedef struct _list_elem
-{
-    struct _list_elem* next;
-    struct _list_elem* prev;
-    list_data_t data;
-    int index;
-    int status;
-} list_elem;
-
-
-typedef struct _list
-{
-    list_elem* buffer;
-    list_elem* free_head;
-    size_t size;
-    size_t capacity;
-    size_t min_capacity;
-} my_list;
-
-
-enum NODE_SATUS
+enum class NODE_STATUS : int
 {
     FREE    = 1,
     ENGAGED = 2, 
     MASTER  = 3 
 };
+
+typedef struct _list_elem {
+    NODE_STATUS status;
+    size_t next;
+    size_t prev;
+    size_t index;
+    list_data_t data;
+} list_elem;
+
+
+typedef struct _list {
+    list_elem* buffer;
+    size_t     free_head_id;
+    size_t     size;
+    size_t     capacity;
+    size_t     min_capacity;
+} my_list;
+
+
 
 typedef enum ERROR_CODES
 {
@@ -46,23 +45,30 @@ typedef enum ERROR_CODES
     NULL_LINK        = 8,
     HEAD_DELEATE     = 9,
     WRONG_INDX       =-2, //these error codes can be normaly returned by functions, so they have "imposble" value 
-    WRONG_ID         =-1 //
+    WRONG_POS        =-1 //
 } LIST_ERR_CODE;
 
 
 LIST_ERR_CODE ListInit     (my_list* list, size_t elem_num);
 LIST_ERR_CODE ListDestroy  (my_list* list);
 
-LIST_ERR_CODE ListInsertRight (my_list* list, size_t id, list_data_t data);
-LIST_ERR_CODE ListInsertLeft  (my_list* list, size_t id, list_data_t data);
-LIST_ERR_CODE ListDelete (my_list* list, size_t id);
+
+/// @brief 
+/// @param list 
+/// @param pos order position of the insert, if counts clockwise
+/// @param data data to be placed in list node, copy is used to prevent changes from the outside
+/// @return 
+LIST_ERR_CODE ListInsertHead(my_list* list, list_data_t data);
+LIST_ERR_CODE ListInsert    (my_list* list, size_t pos, list_data_t data);
+
+LIST_ERR_CODE ListDelete (my_list* list, size_t pos);
 
 LIST_ERR_CODE ListInsertIndex (my_list* list, size_t index, list_data_t data);
 LIST_ERR_CODE ListDeleteIndex (my_list* list, size_t index);
 
 LIST_ERR_CODE ListResize (my_list* list);
 
-list_elem* GetElem (my_list* list, size_t id);
+size_t GetElem (my_list* list, size_t pos);
 
 LIST_ERR_CODE MakeListGreatAgain (my_list* list);
 

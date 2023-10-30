@@ -36,8 +36,7 @@ LIST_ERR_CODE ListInit (my_list* list, size_t elem_num)
     list->buffer[0].next = HEAD_ID;
     list->buffer[0].prev = HEAD_ID;
 
-    for (size_t i = 1; i <= elem_num; i++)
-    {
+    for (size_t i = 1; i <= elem_num; i++) {
         list->buffer[i].index = i;
         int err_code = InsertFreeList (list, i);
     }
@@ -207,8 +206,8 @@ size_t TakeFreeList (my_list* list) {
 
     list_elem* head = ELEM(list, list->free_head_id);
 
-    if (head->next == HEAD_ID) //only head left
-    {
+    //only head left
+    if (head->next == HEAD_ID) {
         list->free_head_id = HEAD_ID;
         head->next = 0;
         head->prev = 0;
@@ -230,9 +229,9 @@ int InsertFreeList (my_list* list, size_t elem)
 
     ELEM(list, elem)->status = NODE_STATUS::FREE;
     ELEM(list, elem)->data = 0;
-
-    if (list->free_head_id == HEAD_ID) // no free elems
-    {
+    
+    // no free elems
+    if (list->free_head_id == HEAD_ID) {
         list->free_head_id     = ELEM(list, elem)->index;        //initing free head
         ELEM(list, elem)->next = ELEM(list, elem)->index;        //cycling the list
         ELEM(list, elem)->prev = ELEM(list, elem)->index;
@@ -250,13 +249,12 @@ int InsertFreeList (my_list* list, size_t elem)
 
 //----------------------------------------INSERT/DELETE BY ELEM'S INDEX-----------------------------------//
 
-int DeleteFreeHead (my_list* list);
-int DeleteIndex (my_list* list, int indx);
-list_elem* TakeFreeList_indx (my_list* list, int indx);
+size_t DeleteFreeHead    (my_list* list);
+size_t DeleteIndex       (my_list* list, size_t indx);
+size_t TakeFreeList_indx (my_list* list, size_t indx);
 
 
-LIST_ERR_CODE ListInsertIndex (my_list* list, size_t index, list_data_t data)
-{
+LIST_ERR_CODE ListInsertIndex (my_list* list, size_t index, list_data_t data) {
     LIST_VALIDATE (list);
 
     if (index > list->capacity)
@@ -264,13 +262,17 @@ LIST_ERR_CODE ListInsertIndex (my_list* list, size_t index, list_data_t data)
 
     ListResize (list);
 
-    list_elem* new_to_add = TakeFreeList_indx (list, index);
-    new_to_add->status = NODE_STATUS::ENGAGED;
+    size_t new_to_add = TakeFreeList_indx (list, index);
+
+    if (new_to_add == LIST_ERR_CODE::WRONG_INDX)
+        return LIST_ERR_CODE::WRONG_INDX;
+    
+    ELEM(list, new_to_add)->status = NODE_STATUS::ENGAGED;
+    ELEM(list, new_to_add)->data   = data;
+
     list->size ++;
 
-    new_to_add->data = data;
-
-    InsertLeft (list->buffer, new_to_add);
+    InsertLeft (list, new_to_add, index);
 
     LIST_VALIDATE (list);
 
@@ -305,51 +307,46 @@ LIST_ERR_CODE ListDeleteIndex (my_list* list, size_t index)
     return SUCCESS;
 }
 
-int DeleteFreeHead (my_list* list)
-{
-    list_elem* old_head = list->free_head;
-    list_elem* new_head = list->free_head->next;
+size_t DeleteFreeHead (my_list* list) {
+    size_t old_head = list->free_head_id;
+    size_t new_head = ELEM(list, old_head)->next;
 
-    new_head->prev = old_head->prev;
-    old_head->prev->next = new_head;
-    list->free_head = new_head;
+    ELEM(list, new_head)->prev = ELEM(list, old_head)->prev;
+    PREV(list, old_head)->next = new_head;
+    list->free_head_id         = new_head;
 
-    old_head->next = NULL;
-    old_head->prev = NULL;
-
-    return SUCCESS;
-}
-
-int DeleteIndex (my_list* list, int indx)
-{
-    list_elem* elem = list->buffer + indx;
-
-    elem->prev->next = elem->next;
-    elem->next->prev = elem->prev;
-
-    elem->next = NULL;
-    elem->prev = NULL;
+    ELEM(list, old_head)->next = 0;
+    ELEM(list, old_head)->prev = 0;
 
     return SUCCESS;
 }
 
-list_elem* TakeFreeList_indx (my_list* list, int indx)
-{
-    list_elem* elem = list->buffer + indx;
-    assert (elem->status == FREE);
+size_t DeleteIndex (my_list* list, size_t indx) {
+    PREV(list, indx)->next = ELEM(list, indx)->next;
+    NEXT(list, indx)->prev = ELEM(list, indx)->prev;
 
-    if (elem->next == elem) //only head left
-    {
-        list->free_head = NULL;
-        elem->next = NULL;
-        elem->prev = NULL;
+    ELEM(list, indx)->next = 0;
+    ELEM(list, indx)->prev = 0;
+
+    return SUCCESS;
+}
+
+size_t TakeFreeList_indx (my_list* list, size_t indx) {
+    size_t elem = ELEM(list, indx)->index;
+
+    if (ELEM(list, elem)->status != NODE_STATUS::FREE)
+        return LIST_ERR_CODE::WRONG_INDX;
+
+    //only head left
+    if (ELEM(list, indx)->next == elem) {
+        list->free_head_id = HEAD_ID;
+        ELEM(list, indx)->next = 0;
+        ELEM(list, indx)->prev = 0;
 
         return elem;
     }
-
-    else if (elem == list->free_head)
+    else if (elem == list->free_head_id)
         DeleteFreeHead (list);
-
     else 
         DeleteIndex (list, indx);
 
@@ -361,31 +358,25 @@ list_elem* TakeFreeList_indx (my_list* list, int indx)
 
 //---------------------------------------------LINIRIAZATION---------------------------------------//
 
-LIST_ERR_CODE MakeListGreatAgain (my_list* list)
-{
+LIST_ERR_CODE MakeListGreatAgain (my_list* list) {
     LIST_VALIDATE (list);
 
-    my_list new_list = {};
-    ListInit (&new_list, list->capacity);
+    size_t pos = 1;
+    while (pos <= list->size) {
+        size_t elem_indx = ELEM(list, pos)->index;
 
-    int indx = 1;
-    list_elem* head = list->buffer;
-    list_elem* elem = head->next;
+        if (elem_indx != pos) {
+            list_elem cache_elem    = list->buffer[pos];
 
-    while (elem != head)
-    {
-        list_data_t data = elem->data;
-        ListInsertIndex (&new_list, indx, data);
-
-        elem = elem->next;
-        indx ++;
+            //swap elements
+            list->buffer[pos]       = list->buffer[elem_indx];
+            list->buffer[elem_indx] = cache_elem;
+            
+            //swap array indxes
+            ELEM(list, pos)->index = pos;
+            ELEM(list, elem_indx)->index = elem_indx;
+        }
     }
-
-    list_elem* old_buffer = list->buffer;
-    list->buffer = new_list.buffer;
-    list->free_head = new_list.free_head;
-
-    FREE (old_buffer);
 
     LIST_VALIDATE (list);
 
@@ -396,59 +387,34 @@ LIST_ERR_CODE MakeListGreatAgain (my_list* list)
 
 
 
-
-
-
 //------------------------------------------RESIZE FUNCTIONS-----------------------------------------//
 
-LIST_ERR_CODE ResizeUp (my_list* list)
-{
+LIST_ERR_CODE ResizeUp (my_list* list) {
     LIST_VALIDATE (list);
+    
+    size_t new_list_size = 2*(list->capacity + !list->capacity);
+    list_elem* new_list = (list_elem*)realloc((void*)list->buffer, new_list_size);
 
-    my_list new_list = {};
-    ListInit (&new_list, 2*list->capacity);
+    if (!new_list)
+        return LIST_ERR_CODE::DATA_NULL;
 
-    for (size_t i = 1; i <= list->capacity; i++)
-    {
-        list_elem* elem = list->buffer + i;
-        list_data_t data = elem->data;
-
-        ListInsertIndex (&new_list, i, data);
-    }
-
-    list->capacity = new_list.capacity;
-    list_elem* old_buffer = list->buffer;
-    list->buffer = new_list.buffer;
-    list->free_head = new_list.free_head;
-
-    FREE (old_buffer);
+    list->buffer = new_list;
 
     LIST_VALIDATE (list);
 
     return SUCCESS;
 }
 
-LIST_ERR_CODE ResizeDown (my_list* list)
-{
+LIST_ERR_CODE ResizeDown (my_list* list) {
     LIST_VALIDATE (list);
 
-    my_list new_list = {};
-    ListInit (&new_list, list->capacity / 2);
+    size_t new_list_size = list->capacity / 2 ;
+    list_elem* new_list = (list_elem*)realloc((void*)list->buffer, new_list_size);
 
-    for (size_t i = 1; i <= list->size; i ++)
-    {
-        list_elem* elem = list->buffer + i;
-        list_data_t data = elem->data;
+    if (!new_list)
+        return LIST_ERR_CODE::DATA_NULL;
 
-        ListInsertIndex (&new_list, i, data);
-    }
-
-    list->capacity = new_list.capacity;
-    list_elem* old_buffer = list->buffer;
-    list->buffer = new_list.buffer;
-    list->free_head = new_list.free_head;
-
-    FREE (old_buffer);
+    list->buffer = new_list;
 
     LIST_VALIDATE (list);
 
@@ -459,13 +425,11 @@ LIST_ERR_CODE ListResize (my_list* list)
 {
     LIST_VALIDATE (list);
 
-    if (CHECK_UP(list))
-    {
+    if (CHECK_UP(list)) {
         MakeListGreatAgain (list);
         ResizeUp (list);
     }
-    else if (CHECK_DOWN(list))
-    {
+    else if (CHECK_DOWN(list)) {
         MakeListGreatAgain (list);
         ResizeDown (list);
     }
@@ -474,5 +438,4 @@ LIST_ERR_CODE ListResize (my_list* list)
 
     return SUCCESS;
 }
-
 //----------------------------------------------------------------------------------------------------------------//

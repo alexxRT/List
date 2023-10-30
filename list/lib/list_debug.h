@@ -2,6 +2,11 @@
 #define LIST_DEBUG
 
 
+// TO DO 
+// add flag that turns on/off debug logs and outputs
+// list will be still verified but without any text warnings
+
+
 void InitLogFile (const char* const log_path);
 void DestroyLogFile ();
 void InitDumpFile (const char* const dump_path);
@@ -12,8 +17,8 @@ void DestroyGraphDumpFile ();
 LIST_ERR_CODE ListTextDump (my_list* list);
 LIST_ERR_CODE ListGraphDump (my_list* list);
 
-LIST_ERR_CODE PrintList (my_list* list, int list_type);  //definition below
-void          PrintListElem (list_elem* elem);
+LIST_ERR_CODE PrintList     (my_list* list, NODE_STATUS node_type);  //definition below
+void          PrintListElem (my_list* list, size_t elem);
 
 
 LIST_ERR_CODE ListValid (my_list* list);

@@ -14,7 +14,7 @@ int main ()
     printf ("\n1) LIST INITED\n");
 
     for (int i = 0; i < 11; i ++)
-        ListInsertRight (&list, 0, i);
+        ListInsertHead (&list, i);
 
     printf ("2) INSERTATION COMPLETE 11 ELEMS\n");
 

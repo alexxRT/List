@@ -29,7 +29,7 @@ void          PrintErr (my_list* list, LIST_ERR_CODE ErrCode, const int line, co
 #define LIST_VALIDATE( lst_ptr )                                 \
 do{                                                              \
     LIST_ERR_CODE ErrCode = ListValid (lst_ptr);                 \
-    if (ErrCode != SUCCESS)                                      \
+    if (ErrCode != LIST_ERR_CODE::SUCCESS)                       \
         {                                                        \
             PrintErr (lst_ptr, ErrCode, __LINE__, __func__);     \
             return ErrCode;                                      \

@@ -41,9 +41,11 @@ typedef enum ERROR_CODES
     LIST_UNDERFLOW   = 4,
     CAPACITY_INVALID = 5,
     WRONG_SIZE       = 6,
-    BROAKEN_LOOP     = 7,
+    BROKEN_LOOP_ENGAGED = 7,
     NULL_LINK        = 8,
     HEAD_DELEATE     = 9,
+    HEAD_INSERT      = 10,
+    BROKEN_LOOP_FREE = 11,
     WRONG_INDX       =-2, //these error codes can be normaly returned by functions, so they have "imposble" value 
     WRONG_POS        =-1 //
 } LIST_ERR_CODE;

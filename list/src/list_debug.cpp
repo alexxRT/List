@@ -88,8 +88,11 @@ void PrintErr (my_list* list, LIST_ERR_CODE ErrCode, const int line, const char*
         case WRONG_SIZE:
             fprintf (log_file, "LIST [%p] has incorrect size - [%lu] ", list, list->size);
             break;
-        case BROAKEN_LOOP:
-            fprintf (log_file, "LIST [%p] the loop is broaken ", list);
+        case BROKEN_LOOP_ENGAGED:
+            fprintf (log_file, "LIST [%p] the ENGAGED loop is broken ", list);
+            break;
+        case BROKEN_LOOP_FREE:
+            fprintf (log_file, "LIST [%p] the FREE loop is broken ", list);
             break;
         case NULL_LINK:
             fprintf (log_file, "LIST [%p] one of elems has invalid NULL link ", list);
@@ -102,6 +105,9 @@ void PrintErr (my_list* list, LIST_ERR_CODE ErrCode, const int line, const char*
             break;
         case HEAD_DELEATE:
             fprintf (log_file, "LIST [%p] Trying to delete HEAD! ", list);
+            break;
+        case HEAD_INSERT:
+            fprintf (log_file, "LIST [%p] Trying to insert by index in the place of HEAD! ", list);
             break;
         case SUCCESS:
             fprintf (log_file, "LIST [%p] is consistant!\n\n", list);
@@ -159,39 +165,47 @@ LIST_ERR_CODE ListFieldsValid (my_list* list)
     return SUCCESS;
 }
 
-LIST_ERR_CODE EngagedListValid (my_list* list) //check if loop is safe and sound, no empty links
-{
-    int num_elems = list->size;
-    int counter = 0;
+LIST_ERR_CODE EngagedListValid (my_list* list) { //check if loop is safe and sound, no empty links
+    size_t num_elems = list->size;
+    size_t counter = 0;
 
-    for (size_t i = 0; i <= list->capacity; i ++)
-    {
+    for (size_t i = 0; i <= list->capacity; i ++) {
         if (list->buffer[i].status == NODE_STATUS::ENGAGED)
             counter ++;
     }
 
-    if (num_elems != counter)
-        return WRONG_SIZE;
+    if (num_elems != counter) {
+        printf ("WRONG SIZE IN ENGAGED LIST\n");
+        printf ("list size: %lu, counter %lu\n", num_elems, counter);
+
+        return LIST_ERR_CODE::WRONG_SIZE;
+    }
     
+    //list cycled on its head
+    if (list->size > 1 && ELEM(list, HEAD_ID)->next == HEAD_ID) {
+        printf ("broke first\n");
+        return LIST_ERR_CODE::BROKEN_LOOP_ENGAGED;
+    }
     size_t head = HEAD_ID;
     size_t elem = head;
 
     // it goes cloсkwise
-    for (int i = 0; i <= num_elems; i ++) {
+    for (size_t i = 0; i <= num_elems; i ++)
         elem = NEXT(list, elem)->index;
-    }
 
-    if (elem != head)
-        return BROAKEN_LOOP;
+    if (elem != head) {
+        printf("broke second\n");
+        return LIST_ERR_CODE::BROKEN_LOOP_ENGAGED;
+    }
 
     //it goes counter-clockwise
-    for (int i = 0; i <= num_elems; i ++) {
+    for (size_t i = 0; i <= num_elems; i ++)
         elem = PREV(list, elem)->index;
+
+    if (elem != head) {
+        printf("brok third\n");
+        return LIST_ERR_CODE::BROKEN_LOOP_ENGAGED;
     }
-
-    if (elem != head)
-        return BROAKEN_LOOP;
-
 
     // ? ? ? ? ? TODO IS IT CORRECT ? ? ? ? ? ?
     //double check, forward and backward
@@ -203,31 +217,47 @@ LIST_ERR_CODE EngagedListValid (my_list* list) //check if loop is safe and sound
     return SUCCESS;
 }
 
-LIST_ERR_CODE FreeListValid (my_list* list)
-{
+LIST_ERR_CODE FreeListValid (my_list* list) {
     //free list is empty, nothing to check
-    int free_size = list->capacity - list->size;
+
+    size_t free_size = list->capacity - list->size;
+    size_t counter = 0;
+
+    for (size_t i = 0; i <= list->capacity; i ++) {
+        if (list->buffer[i].status == NODE_STATUS::FREE)
+            counter ++;
+    }
+
+    if (counter != free_size) {
+        printf ("WRONG SIZE IN FREE LIST\n");
+        printf ("free list size: %lu, counter %lu\n", free_size, counter);
+        return WRONG_SIZE;
+    }
+
     if (!free_size)
         return SUCCESS;
+
+    //free list cycled on its head
+    if (ELEM(list, list->free_head_id)->next == list->free_head_id && free_size > 1)
+        return BROKEN_LOOP_FREE;
 
     size_t head = list->free_head_id;
     size_t elem = head;
 
     // it goes cloсkwise
-    for (int i = 0; i < free_size; i ++) {
+    for (size_t i = 0; i < free_size; i ++) {
         elem = NEXT(list, elem)->index;
     }
 
     if (elem != head)
-        return BROAKEN_LOOP;
+        return BROKEN_LOOP_FREE;
 
     //it goes counter-clockwise
-    for (int i = 0; i < free_size; i ++) {
+    for (size_t i = 0; i < free_size; i ++)
         elem = PREV(list, elem)->index;
-    }
 
     if (elem != head)
-        return BROAKEN_LOOP;
+        return BROKEN_LOOP_FREE;
 
     return SUCCESS;
 }
@@ -274,10 +304,7 @@ LIST_ERR_CODE ListTextDump (my_list* list) {
 
 int GetElemPos (my_list* list, size_t index, NODE_STATUS stat);
 
-LIST_ERR_CODE ListGraphDump (my_list* list)
-{
-    LIST_VALIDATE (list);
-
+LIST_ERR_CODE ListGraphDump (my_list* list) {
     assert (graph_file != NULL && "Please init GraphDump file");
 
     //initilizing starting attributes
@@ -289,13 +316,11 @@ LIST_ERR_CODE ListGraphDump (my_list* list)
     node [ shape=record ];\n\
     ");
 
+    printf("\nSTART GRAPH DUMP\n");
 
-    for (size_t i = 0; i <= list->capacity; i ++) //initing each node, gives it color, data, order num
-    {
+    //initing each node, gives it color, data, order num
+    for (size_t i = 0; i <= list->capacity; i ++) { 
         size_t pos = GetElemPos (list, i, list->buffer[i].status);
-
-        if (pos == WRONG_INDX)
-            return WRONG_INDX;
 
         fprintf (graph_file, "\n\tNode%zu", i);
         fprintf (graph_file, "[label = \"INDX: %zu|NUM: %lu|DATA: %d\";];\n", i, pos, list->buffer[i].data);
@@ -333,9 +358,6 @@ LIST_ERR_CODE ListGraphDump (my_list* list)
     }
 
     fprintf (graph_file, "}\n");
-
-
-    LIST_VALIDATE (list);
 
     return SUCCESS;
 }
@@ -414,9 +436,9 @@ int GetElemPos (my_list* list, size_t index, NODE_STATUS stat) {
     else 
         head = list->free_head_id;
 
-    int counter = 0;
+    size_t counter = 0;
 
-    if (index == ELEM(list, index)->index)
+    if (index == ELEM(list, head)->index)
         return counter;
 
     counter++;
@@ -427,7 +449,12 @@ int GetElemPos (my_list* list, size_t index, NODE_STATUS stat) {
         if (index == current_elem)
             return counter;
         
-        current_elem = NEXT(list, current_elem)->index;
+        current_elem = ELEM(list, current_elem)->next;
+        //current_elem = NEXT(list, current_elem)->index;
+
+        if (counter >= list->capacity)
+            break;
+
         counter++;
     }
 
